@@ -87,8 +87,10 @@ int main(int argc, char **argv)
     
     //Define SQL actions based on the pieces of data.
     N = touchstone_data_set->NumberOfMeasurements();
+    std::cout<<"Defining "<<N<<" SQL actions."<<std::endl;
     for(j=0;j<N;++j)
     {
+		std::cout<<"Table "<<j<<std::endl;
         sqlCurrent = "create table '"+touchstone_data_set->GetData(j).PrintPartNumber()
         +"'(frequencies number(3.3), "
         +"S11dB number(3.3), S11angle number(3.3), "
@@ -129,6 +131,7 @@ int main(int argc, char **argv)
         {
             ++performedActions;
         }
+        std::cout<<"Performed actions: "<<performedActions<<" of "<<totalActions<<std::endl;
     }
     
     //Close the SQL database.
