@@ -35,8 +35,12 @@ int main(int argc, char **argv)
     std::string current_file = "";
     std::string sub = "";
     std::stringstream iss;
-    int N,M,j,k;
-    N = M = j = k = 0;
+    int N,M,j,k,q;
+    N = M = j = k = q = 0;
+    const char split_char = ' ';
+    const std::string errorChar1 = " ";
+    const std::string errorChar2 = "\\n";
+    const int TouchStoneRowLength = 9;
     
     //Handle arguments.
     if(argc!=3)
@@ -54,17 +58,19 @@ int main(int argc, char **argv)
         std::cout<<"Incorporating this file: "<<current_file<<std::endl;
         std::ifstream infile(current_file);
         current_file = current_file.erase(current_file.find("."),std::string::npos);
-        do {std::getline(infile,thisLine);} while(thisLine.find("HZ")==std::string::npos);
-        while(infile.good() && !infile.eof())
+        do {std::getline(infile,thisLine);} while(thisLine.find("#")==std::string::npos);
+        while(std::getline(infile,thisLine))
         {
-            std::getline(infile,thisLine);
-            if(thisLine=="") break;
-            iss.str(thisLine);
-            do
-            {
-                iss >> sub;
-                thisRow.push_back(sub);
-            } while(iss);
+			iss.str(thisLine);
+			for(sub=" ";std::getline(iss,sub,split_char);++q)
+			{
+				if(sub!=errorChar1 && q<TouchStoneRowLength)
+				{
+					thisRow.push_back(sub);
+				}
+				else continue;
+			}
+			q=0;
             iss.clear();
             cs.push_back(thisRow);
             thisRow.clear();
@@ -77,6 +83,7 @@ int main(int argc, char **argv)
         cs.clear();
     }
     all_files.close();
+    std::cout<<"Read all Touchstone files from list."<<std::endl;
     
     //Define SQL actions based on the pieces of data.
     N = touchstone_data_set->NumberOfMeasurements();
@@ -84,12 +91,11 @@ int main(int argc, char **argv)
     {
         sqlCurrent = "create table '"+touchstone_data_set->GetData(j).PrintPartNumber()
         +"'(frequencies number(3.3), "
-        +"S11(dB) number(3.3), S11(angle) number(3.3), "
-        +"S21(dB) number(3.3), S21(angle) number(3.3), "
-        +"S12(dB) number(3.3), S12(angle) number(3.3), "
-        +"S22(dB) number(3.3), S22(angle) number(3.3));";
+        +"S11dB number(3.3), S11angle number(3.3), "
+        +"S21dB number(3.3), S21angle number(3.3), "
+        +"S12dB number(3.3), S12angle number(3.3), "
+        +"S22dB number(3.3), S22angle number(3.3));";
         statements.push_back(sqlCurrent);
-        std::cout<<sqlCurrent<<std::endl;
         M = touchstone_data_set->GetData(j).GetDataLength();
         for (k=0;k<M;++k)
         {
@@ -98,34 +104,34 @@ int main(int argc, char **argv)
             statements.push_back(sqlCurrent);
         }
     }
-    totalActions=statements.size()-1;
+    totalActions=statements.size();
 
-//    //Open the SQL database.
-//    rc = sqlite3_open(argv[1], &db);
-//    if(rc)
-//    {
-//        fprintf(stderr,"Can't open database: %s\n",sqlite3_errmsg(db));
-//        sqlite3_close(db);
-//        return(1);
-//    }
-//    
-//    //Perform list of SQL actions.
-//    while(performedActions!=totalActions)
-//    {
-//        rc = sqlite3_exec(db,statements[performedActions].c_str(),callback,0,&zErrMsg);
-//        if(rc!=SQLITE_OK)
-//        {
-//            fprintf(stderr, "SQL error: %s, action #%i\n",zErrMsg,performedActions);
-//            sqlite3_free(zErrMsg);
-//            break;
-//        }
-//        else
-//        {
-//            ++performedActions;
-//        }
-//    }
-//    
-//    //Close the SQL database.
-//    sqlite3_close(db);
+    //Open the SQL database.
+    rc = sqlite3_open(argv[1], &db);
+    if(rc)
+    {
+        fprintf(stderr,"Can't open database: %s\n",sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return(1);
+    }
+    
+    //Perform list of SQL actions.
+    while(performedActions!=totalActions)
+    {
+        rc = sqlite3_exec(db,statements[performedActions].c_str(),callback,0,&zErrMsg);
+        if(rc!=SQLITE_OK)
+        {
+            fprintf(stderr, "SQL error: %s, action #%i\n",zErrMsg,performedActions);
+            sqlite3_free(zErrMsg);
+            break;
+        }
+        else
+        {
+            ++performedActions;
+        }
+    }
+    
+    //Close the SQL database.
+    sqlite3_close(db);
     return 0;
 }

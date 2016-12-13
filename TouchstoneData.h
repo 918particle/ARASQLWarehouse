@@ -36,13 +36,13 @@ public:
         }
     }
     std::string PrintPartNumber() {return part_number;}
-    int GetDataLength(){return data[0].size();}
+    int GetDataLength(){return rows;}
     std::string GetDataRow(int k)
     {
         std::string result="";
-        for (int i=0;i<rows;++i)
+        for (int i=0;i<columns;++i)
         {
-            if(i<(rows-1))
+            if(i<(columns-1))
             {
                 result+=(data[k][i]+", ");
             }
