@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <cctype>
+#include <cstddef>
 #include "TouchStoneDataSet.h"
 
 static int callback(void *NotUsed, int argc, char **argv, char **azColName)
@@ -16,6 +17,18 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName)
     return 0;
 }
 
+std::string SplitFilename(std::string str)
+{
+  std::size_t found = str.find_last_of("/\\");
+  return str.substr(found+1);
+}
+
+std::string RemoveFileExtension(std::string str)
+{
+	std::size_t found = str.find_last_of(".");
+	return str.substr(0,found);
+}
+
 int main(int argc, char **argv)
 {
     //Declare variables.
@@ -27,7 +40,6 @@ int main(int argc, char **argv)
     std::vector<std::string> statements;
     int totalActions=0;
     int performedActions=0;
-    float c;
     std::vector<std::vector<std::string> > cs; cs.clear();
     std::vector<std::string> thisRow; thisRow.clear();
     std::string thisLine;
@@ -35,42 +47,41 @@ int main(int argc, char **argv)
     std::string current_file = "";
     std::string sub = "";
     std::stringstream iss;
-    int N,M,j,k,q;
-    N = M = j = k = q = 0;
-    const char split_char = ' ';
-    const std::string errorChar1 = " ";
-    const std::string errorChar2 = "\\n";
+    int N,M,j,k,q,count;
+    N = M = j = k = q = count = 0;
+    const char split_char = '\t';
     const int TouchStoneRowLength = 9;
-    
+        
     //Handle arguments.
-    if(argc!=3)
+    if(argc!=4)
     {
-        fprintf(stderr,"Usage: %s DATABASE-NAME INPUT-FILE-NAME\n",argv[0]);
+        fprintf(stderr,"Usage: %s DATABASE-NAME INPUT-FILE-NAME VERBOSITY(0/1)\n",argv[0]);
         return(1);
     }
+    int verbosityLevel = atoi(argv[3]);
     
     //Read data from the list of files, and create TouchStoneDataSet objects.
     std::ifstream all_files(argv[2]);
-    while (all_files.good() && !all_files.eof())
+    while (std::getline(all_files,current_file))
     {
-        std::getline(all_files,current_file);
-        if(current_file=="") break;
-        std::cout<<"Incorporating this file: "<<current_file<<std::endl;
+        if(verbosityLevel) std::cout<<"Incorporating this file: "<<current_file<<std::endl;
         std::ifstream infile(current_file);
-        current_file = current_file.erase(current_file.find("."),std::string::npos);
+        current_file = SplitFilename(RemoveFileExtension(current_file));
         do {std::getline(infile,thisLine);} while(thisLine.find("#")==std::string::npos);
         while(std::getline(infile,thisLine))
         {
 			iss.str(thisLine);
 			for(sub=" ";std::getline(iss,sub,split_char);++q)
 			{
-				if(sub!=errorChar1 && q<TouchStoneRowLength)
+				if(sub.size()==0) continue;
+				if(!isspace(sub.at(0)) && count<TouchStoneRowLength)
 				{
 					thisRow.push_back(sub);
+					++count;
 				}
-				else continue;
 			}
 			q=0;
+			count=0;
             iss.clear();
             cs.push_back(thisRow);
             thisRow.clear();
@@ -83,14 +94,14 @@ int main(int argc, char **argv)
         cs.clear();
     }
     all_files.close();
-    std::cout<<"Read all Touchstone files from list."<<std::endl;
+    if(verbosityLevel) std::cout<<"Read all Touchstone files from list."<<std::endl;
     
     //Define SQL actions based on the pieces of data.
     N = touchstone_data_set->NumberOfMeasurements();
-    std::cout<<"Defining "<<N<<" SQL actions."<<std::endl;
+    if(verbosityLevel) std::cout<<"Defining "<<N<<" SQL tables."<<std::endl;
     for(j=0;j<N;++j)
     {
-		std::cout<<"Table "<<j<<std::endl;
+		if(verbosityLevel) std::cout<<"Table "<<j<<std::endl;
         sqlCurrent = "create table '"+touchstone_data_set->GetData(j).PrintPartNumber()
         +"'(frequencies number(3.3), "
         +"S11dB number(3.3), S11angle number(3.3), "
@@ -109,8 +120,7 @@ int main(int argc, char **argv)
     totalActions=statements.size();
 
     //Open the SQL database.
-    rc = sqlite3_open(argv[1], &db);
-    if(rc)
+    if(sqlite3_open(argv[1], &db))
     {
         fprintf(stderr,"Can't open database: %s\n",sqlite3_errmsg(db));
         sqlite3_close(db);
@@ -120,18 +130,14 @@ int main(int argc, char **argv)
     //Perform list of SQL actions.
     while(performedActions!=totalActions)
     {
-        rc = sqlite3_exec(db,statements[performedActions].c_str(),callback,0,&zErrMsg);
-        if(rc!=SQLITE_OK)
+        if(sqlite3_exec(db,statements[performedActions].c_str(),callback,0,&zErrMsg)!=SQLITE_OK)
         {
             fprintf(stderr, "SQL error: %s, action #%i\n",zErrMsg,performedActions);
             sqlite3_free(zErrMsg);
             break;
         }
-        else
-        {
-            ++performedActions;
-        }
-        std::cout<<"Performed actions: "<<performedActions<<" of "<<totalActions<<std::endl;
+        else ++performedActions;
+        if(verbosityLevel) std::cout<<"Performed actions: "<<performedActions<<" of "<<totalActions<<std::endl;
     }
     
     //Close the SQL database.
