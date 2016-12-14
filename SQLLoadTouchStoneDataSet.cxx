@@ -29,6 +29,12 @@ std::string RemoveFileExtension(std::string str)
 	return str.substr(0,found);
 }
 
+void FindDataInFile(std::ifstream infile,std::string thisLine)
+{
+	do {std::getline(infile,thisLine);}
+	while(thisLine.find("#")==std::string::npos);
+}
+
 int main(int argc, char **argv)
 {
     //Declare variables.
@@ -42,7 +48,6 @@ int main(int argc, char **argv)
     int performedActions=0;
     std::vector<std::vector<std::string> > cs; cs.clear();
     std::vector<std::string> thisRow; thisRow.clear();
-    std::string thisLine;
     TouchStoneDataSet *touchstone_data_set = new TouchStoneDataSet();
     std::string current_file = "";
     std::string sub = "";
@@ -51,23 +56,33 @@ int main(int argc, char **argv)
     N = M = j = k = q = count = 0;
     const char split_char = '\t';
     const int TouchStoneRowLength = 9;
+    int verbosityLevel;
         
     //Handle arguments.
-    if(argc!=4)
+    if(argc==3)
     {
+		verbosityLevel = 0;
+	}
+	if(argc==4)
+	{
+		verbosityLevel = atoi(argv[3]);
+	}
+	if(argc<=2)
+	{
         fprintf(stderr,"Usage: %s DATABASE-NAME INPUT-FILE-NAME VERBOSITY(0/1)\n",argv[0]);
         return(1);
     }
-    int verbosityLevel = atoi(argv[3]);
     
     //Read data from the list of files, and create TouchStoneDataSet objects.
+    //void ProcessAllFiles(std::ifstream,std::string);
     std::ifstream all_files(argv[2]);
     while (std::getline(all_files,current_file))
     {
+		std::string thisLine="";
         if(verbosityLevel) std::cout<<"Incorporating this file: "<<current_file<<std::endl;
         std::ifstream infile(current_file);
         current_file = SplitFilename(RemoveFileExtension(current_file));
-        do {std::getline(infile,thisLine);} while(thisLine.find("#")==std::string::npos);
+        FindDataInFile(infile,thisLine);
         while(std::getline(infile,thisLine))
         {
 			iss.str(thisLine);
